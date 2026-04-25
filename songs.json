@@ -1,0 +1,30 @@
+{
+  "showTitle": "My Show",
+  "songs": [
+    {
+      "title": "01 - Our Turn Now",
+      "instr": "audio/01 - Our Turn Now - instrumental.mp3",
+      "vocal": "audio/01 - Our Turn Now - vocals.mp3"
+    },
+    {
+      "title": "02 - Peddler Song",
+      "instr": "audio/02 - Peddler Song - instrumental.mp3",
+      "vocal": "audio/02 - Peddler Song - vocals.mp3"
+    },
+    {
+      "title": "03 - Pick Me",
+      "instr": "audio/03 - Pick Me - instrumental.mp3",
+      "vocal": "audio/03 - Pick Me - vocals.mp3"
+    },
+    {
+      "title": "04 - Scientifically Terrific",
+      "instr": "audio/04 - Scientifically Terrific - instrumental.mp3",
+      "vocal": "audio/04 - Scientifically Terrific - vocals.mp3"
+    },
+    {
+      "title": "05 - I'll Find you Soon",
+      "instr": "audio/05 - I'll Find you Soon - instrumental.mp3",
+      "vocal": "audio/05 - I'll Find you Soon - vocals.mp3"
+    }
+  ]
+}
