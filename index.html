@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="StemPlayer">
-    <title>Stem Player 2.4</title>
+    <title>Stem Player 2.5</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -736,6 +736,23 @@
             transition: all 0.15s;
         }
         .sidebar-bottom-btn-sm:hover { color: #aaa; border-color: #444; }
+
+        /* ── Drag-to-reorder (playlist edit mode) ── */
+        .drag-handle {
+            cursor: grab;
+            color: #444;
+            font-size: 16px;
+            padding-right: 6px;
+            flex-shrink: 0;
+            user-select: none;
+            touch-action: none;
+            line-height: 1;
+        }
+        .drag-handle:hover { color: #888; }
+        .drag-handle:active { cursor: grabbing; }
+        .song-item.dragging { opacity: 0.35; background: #1a1a1c; }
+        .song-item.drag-over-top    { border-top: 2px solid #2c5f9e !important; }
+        .song-item.drag-over-bottom { border-bottom: 2px solid #2c5f9e !important; }
     </style>
 </head>
 <body>
@@ -743,7 +760,7 @@
 <header>
     <button class="mobile-menu-btn" id="menuBtn" onclick="toggleSidebar()" title="Song list">&#9776;</button>
     <h1>Stem Player</h1>
-    <span class="version">v2.4</span>
+    <span class="version">v2.5</span>
     <span class="cache-badge" id="cacheBadge"></span>
 </header>
 
@@ -1737,24 +1754,38 @@ function renderSongList() {
         return;
     }
 
-    // ── Edit mode: all songs with checkboxes ──────────────────────────────────
+    // ── Edit mode: songs with checkboxes + drag handles ─────────────────────────
     if (isEditingPlaylist) {
-        const currentChecked = editingPlaylistName
-            ? new Set(playlists[editingPlaylistName] || [])
-            : new Set();
+        const inPlaylist  = editingPlaylistName ? (playlists[editingPlaylistName] || []) : [];
+        const inSet       = new Set(inPlaylist);
+        // Show existing playlist songs first (in their saved order), then the rest
+        const orderedSongs = [
+            ...inPlaylist.filter(s => library[s]),
+            ...allSongs.filter(s => !inSet.has(s))
+        ];
         list.innerHTML = '';
-        allSongs.forEach(name => {
+        orderedSongs.forEach(name => {
+            const checked = inSet.has(name);
             const div = document.createElement('div');
-            const checked = currentChecked.has(name);
             div.className = 'song-item playlist-check' + (checked ? ' checked' : '');
-            div.innerHTML = `<input type="checkbox" class="song-check" data-song="${name.replace(/"/g,'&quot;')}" ${checked ? 'checked' : ''}><span>${name}</span>`;
+            div.dataset.song = name;
+            div.draggable = true;
+            div.innerHTML = `<span class="drag-handle" title="Drag to reorder">⠿</span><input type="checkbox" class="song-check" data-song="${name.replace(/"/g,'&quot;')}" ${checked ? 'checked' : ''}><span class="song-label">${name}</span>`;
             div.addEventListener('click', e => {
-                if (e.target.tagName !== 'INPUT') {
-                    const cb = div.querySelector('input');
-                    cb.checked = !cb.checked;
-                }
-                div.classList.toggle('checked', div.querySelector('input').checked);
+                if (e.target.classList.contains('drag-handle') || e.target.tagName === 'INPUT') return;
+                const cb = div.querySelector('input');
+                cb.checked = !cb.checked;
+                div.classList.toggle('checked', cb.checked);
             });
+            // ── HTML5 drag ──
+            div.addEventListener('dragstart', onDragStart);
+            div.addEventListener('dragover',  onDragOver);
+            div.addEventListener('dragleave', onDragLeave);
+            div.addEventListener('drop',      onDrop);
+            div.addEventListener('dragend',   onDragEnd);
+            // ── Touch drag (mobile) ──
+            const handle = div.querySelector('.drag-handle');
+            handle.addEventListener('touchstart', onTouchDragStart, { passive: false });
             list.appendChild(div);
         });
         return;
@@ -2586,7 +2617,10 @@ function confirmSavePlaylist() {
     const nameInput = document.getElementById('playlistNameInput');
     const name = nameInput ? nameInput.value.trim() : '';
     if (!name) { nameInput?.focus(); return; }
-    const checked = Array.from(document.querySelectorAll('.song-check:checked')).map(cb => cb.dataset.song);
+    // Collect in current DOM order (respects drag reordering), checked items only
+    const checked = Array.from(document.querySelectorAll('.song-item.playlist-check'))
+        .filter(el => el.querySelector('input')?.checked)
+        .map(el => el.dataset.song);
     if (editingPlaylistName && editingPlaylistName !== name) delete playlists[editingPlaylistName];
     playlists[name] = checked;
     savePlaylists();
@@ -2640,6 +2674,102 @@ function importPlaylists() {
         reader.readAsText(file);
     };
     input.click();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Drag-to-reorder (playlist edit mode)
+// ══════════════════════════════════════════════════════════════════════════════
+let dragSrcEl  = null;
+
+// ── HTML5 mouse drag ─────────────────────────────────────────────────────────
+function onDragStart(e) {
+    dragSrcEl = this;
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => this.classList.add('dragging'), 0);
+}
+
+function onDragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (this === dragSrcEl) return;
+    this.classList.remove('drag-over-top', 'drag-over-bottom');
+    const mid = this.getBoundingClientRect().top + this.getBoundingClientRect().height / 2;
+    this.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+}
+
+function onDragLeave() {
+    this.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onDrop(e) {
+    e.preventDefault();
+    if (!dragSrcEl || dragSrcEl === this) return;
+    const mid = this.getBoundingClientRect().top + this.getBoundingClientRect().height / 2;
+    if (e.clientY < mid) {
+        this.parentNode.insertBefore(dragSrcEl, this);
+    } else {
+        this.parentNode.insertBefore(dragSrcEl, this.nextSibling);
+    }
+    this.classList.remove('drag-over-top', 'drag-over-bottom');
+}
+
+function onDragEnd() {
+    this.classList.remove('dragging');
+    document.querySelectorAll('.song-item').forEach(el =>
+        el.classList.remove('drag-over-top', 'drag-over-bottom')
+    );
+    dragSrcEl = null;
+}
+
+// ── Touch drag (mobile) ──────────────────────────────────────────────────────
+let touchDragEl   = null;
+let touchLastOver = null;
+
+function onTouchDragStart(e) {
+    e.preventDefault();
+    touchDragEl = this.closest('.song-item');
+    touchDragEl.classList.add('dragging');
+    document.addEventListener('touchmove',  onTouchDragMove,  { passive: false });
+    document.addEventListener('touchend',   onTouchDragEnd);
+    document.addEventListener('touchcancel',onTouchDragEnd);
+}
+
+function onTouchDragMove(e) {
+    if (!touchDragEl) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    touchDragEl.style.display = 'none';
+    const elBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchDragEl.style.display = '';
+    const target = elBelow?.closest('.song-item.playlist-check');
+    if (touchLastOver && touchLastOver !== target) {
+        touchLastOver.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+    if (target && target !== touchDragEl) {
+        const rect = target.getBoundingClientRect();
+        const mid  = rect.top + rect.height / 2;
+        target.classList.remove('drag-over-top', 'drag-over-bottom');
+        target.classList.add(touch.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+        touchLastOver = target;
+        if (touch.clientY < mid) {
+            target.parentNode.insertBefore(touchDragEl, target);
+        } else {
+            target.parentNode.insertBefore(touchDragEl, target.nextSibling);
+        }
+    }
+}
+
+function onTouchDragEnd() {
+    if (!touchDragEl) return;
+    touchDragEl.classList.remove('dragging');
+    document.querySelectorAll('.song-item').forEach(el =>
+        el.classList.remove('drag-over-top', 'drag-over-bottom')
+    );
+    touchDragEl  = null;
+    touchLastOver = null;
+    document.removeEventListener('touchmove',   onTouchDragMove);
+    document.removeEventListener('touchend',    onTouchDragEnd);
+    document.removeEventListener('touchcancel', onTouchDragEnd);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
