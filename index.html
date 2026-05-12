@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="StemPlayer">
-    <title>Stem Player 2.3</title>
+    <title>Stem Player 2.4</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -605,6 +605,137 @@
             letter-spacing: 1px;
             opacity: 0.7;
         }
+
+        /* ════════════════════════════════════════════════════
+           Playlist UI
+        ════════════════════════════════════════════════════ */
+        .playlist-bar {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #2c2c2e;
+            flex-shrink: 0;
+        }
+        .playlist-select {
+            flex: 1;
+            background: #222;
+            color: #aaa;
+            border: 1px solid #333;
+            border-radius: 5px;
+            padding: 5px 6px;
+            font-size: 12px;
+            outline: none;
+            cursor: pointer;
+            min-width: 0;
+        }
+        .playlist-select:focus { border-color: #555; }
+        .playlist-icon-btn {
+            width: 26px;
+            height: 26px;
+            background: none;
+            border: 1px solid #333;
+            border-radius: 5px;
+            color: #555;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .playlist-icon-btn:hover { border-color: #666; color: #aaa; }
+        .playlist-icon-btn.hidden { display: none; }
+
+        .playlist-edit-bar {
+            padding: 8px 10px;
+            border-bottom: 1px solid #2c2c2e;
+            flex-direction: column;
+            gap: 6px;
+            flex-shrink: 0;
+            background: #1a1a1c;
+        }
+        .playlist-name-input {
+            width: 100%;
+            background: #222;
+            color: #ddd;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 6px 8px;
+            font-size: 12px;
+            outline: none;
+        }
+        .playlist-name-input:focus { border-color: #2c5f9e; }
+        .playlist-edit-actions { display: flex; gap: 6px; }
+        .playlist-save-btn {
+            flex: 1;
+            padding: 5px;
+            background: #2c5f9e;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .playlist-save-btn:hover { background: #3a72b8; }
+        .playlist-cancel-btn {
+            flex: 1;
+            padding: 5px;
+            background: transparent;
+            color: #666;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .playlist-cancel-btn:hover { color: #aaa; border-color: #555; }
+
+        .song-item.playlist-check { display: flex; align-items: center; gap: 8px; }
+        .song-item.playlist-check input[type=checkbox] {
+            width: 14px; height: 14px; flex-shrink: 0; accent-color: #2c5f9e; cursor: pointer;
+        }
+        .song-item.playlist-check.checked {
+            background: #1a3a5c; color: #fff; border-left-color: #2c5f9e;
+        }
+
+        .sidebar-bottom {
+            padding: 8px 10px;
+            border-top: 1px solid #2c2c2e;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        .sidebar-bottom-btn {
+            width: 100%;
+            padding: 7px;
+            background: transparent;
+            color: #666;
+            border: 1px solid #333;
+            border-radius: 5px;
+            font-size: 11px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.15s;
+        }
+        .sidebar-bottom-btn:hover { color: #aaa; border-color: #555; }
+        .sidebar-bottom-row { display: flex; gap: 5px; }
+        .sidebar-bottom-btn-sm {
+            flex: 1;
+            padding: 6px;
+            background: transparent;
+            color: #555;
+            border: 1px solid #2c2c2e;
+            border-radius: 5px;
+            font-size: 10px;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: all 0.15s;
+        }
+        .sidebar-bottom-btn-sm:hover { color: #aaa; border-color: #444; }
     </style>
 </head>
 <body>
@@ -612,7 +743,7 @@
 <header>
     <button class="mobile-menu-btn" id="menuBtn" onclick="toggleSidebar()" title="Song list">&#9776;</button>
     <h1>Stem Player</h1>
-    <span class="version">v2.3</span>
+    <span class="version">v2.4</span>
     <span class="cache-badge" id="cacheBadge"></span>
 </header>
 
@@ -626,8 +757,29 @@
             <div class="show-title" id="showTitle">Stem Player</div>
             <div class="manifest-status" id="manifestStatus">Loading songs…</div>
         </div>
+        <div class="playlist-bar" id="playlistBar">
+            <select class="playlist-select" id="playlistSelect" onchange="onPlaylistSelect(this.value)">
+                <option value="all">All Songs</option>
+            </select>
+            <button class="playlist-icon-btn hidden" id="editPlaylistBtn" onclick="startEditPlaylist()" title="Edit playlist">✎</button>
+            <button class="playlist-icon-btn hidden" id="deletePlaylistBtn" onclick="deleteActivePlaylist()" title="Delete playlist">✕</button>
+        </div>
+        <div class="playlist-edit-bar" id="playlistEditBar" style="display:none">
+            <input type="text" id="playlistNameInput" placeholder="Playlist name…" class="playlist-name-input">
+            <div class="playlist-edit-actions">
+                <button class="playlist-save-btn" onclick="confirmSavePlaylist()">Save</button>
+                <button class="playlist-cancel-btn" onclick="cancelEditPlaylist()">Cancel</button>
+            </div>
+        </div>
         <div class="song-list" id="songList">
             <div class="empty-list" id="emptyList">Loading…</div>
+        </div>
+        <div class="sidebar-bottom">
+            <button class="sidebar-bottom-btn" onclick="startNewPlaylist()">+ New Playlist</button>
+            <div class="sidebar-bottom-row">
+                <button class="sidebar-bottom-btn-sm" onclick="exportPlaylists()">⬇ Export</button>
+                <button class="sidebar-bottom-btn-sm" onclick="importPlaylists()">⬆ Import</button>
+            </div>
         </div>
     </div>
 
@@ -1575,16 +1727,51 @@ async function loadManifest() {
 // ══════════════════════════════════════════════════════════════════════════════
 function renderSongList() {
     const list = document.getElementById('songList');
-    const pairs = Object.keys(library)
-        .filter(n => library[n].instr)   // vocal is optional (instrumental-only tracks allowed)
+
+    const allSongs = Object.keys(library)
+        .filter(n => library[n].instr)
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 
-    if (pairs.length === 0) {
-        list.innerHTML = '<div class="empty-list">No matching pairs found.<br><br>Files must be named:<br><em>Song - Vocals.mp3<br>Song - Instrumental.mp3</em></div>';
+    if (allSongs.length === 0) {
+        list.innerHTML = '<div class="empty-list" id="emptyList">No songs found.</div>';
         return;
     }
+
+    // ── Edit mode: all songs with checkboxes ──────────────────────────────────
+    if (isEditingPlaylist) {
+        const currentChecked = editingPlaylistName
+            ? new Set(playlists[editingPlaylistName] || [])
+            : new Set();
+        list.innerHTML = '';
+        allSongs.forEach(name => {
+            const div = document.createElement('div');
+            const checked = currentChecked.has(name);
+            div.className = 'song-item playlist-check' + (checked ? ' checked' : '');
+            div.innerHTML = `<input type="checkbox" class="song-check" data-song="${name.replace(/"/g,'&quot;')}" ${checked ? 'checked' : ''}><span>${name}</span>`;
+            div.addEventListener('click', e => {
+                if (e.target.tagName !== 'INPUT') {
+                    const cb = div.querySelector('input');
+                    cb.checked = !cb.checked;
+                }
+                div.classList.toggle('checked', div.querySelector('input').checked);
+            });
+            list.appendChild(div);
+        });
+        return;
+    }
+
+    // ── Normal mode ───────────────────────────────────────────────────────────
+    let displaySongs = allSongs;
+    if (activePlaylist !== 'all' && playlists[activePlaylist]) {
+        displaySongs = playlists[activePlaylist].filter(s => library[s]);
+        if (displaySongs.length === 0) {
+            list.innerHTML = '<div class="empty-list">Playlist is empty.<br>Tap ✎ to add songs.</div>';
+            return;
+        }
+    }
+
     list.innerHTML = '';
-    pairs.forEach(name => {
+    displaySongs.forEach(name => {
         const div = document.createElement('div');
         div.className = 'song-item' + (name === currentSong ? ' active' : '');
         div.textContent = name;
@@ -2317,6 +2504,145 @@ document.addEventListener('keydown', e => {
 });
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Playlists — stored in localStorage
+// ══════════════════════════════════════════════════════════════════════════════
+let playlists          = {};
+let activePlaylist     = 'all';
+let isEditingPlaylist  = false;
+let editingPlaylistName = null;   // null = new playlist, string = editing existing
+
+const PLAYLISTS_KEY = 'stemplayer_playlists';
+
+function loadPlaylists() {
+    try {
+        const stored = localStorage.getItem(PLAYLISTS_KEY);
+        playlists = stored ? JSON.parse(stored) : {};
+    } catch(e) { playlists = {}; }
+}
+
+function savePlaylists() {
+    localStorage.setItem(PLAYLISTS_KEY, JSON.stringify(playlists));
+}
+
+function renderPlaylistBar() {
+    const sel = document.getElementById('playlistSelect');
+    if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = '<option value="all">All Songs</option>';
+    Object.keys(playlists).sort().forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name;
+        opt.textContent = name;
+        sel.appendChild(opt);
+    });
+    if (prev && (prev === 'all' || playlists[prev])) {
+        sel.value = prev;
+        activePlaylist = sel.value;
+    } else {
+        sel.value = 'all';
+        activePlaylist = 'all';
+    }
+    const isPlaylist = sel.value !== 'all';
+    document.getElementById('editPlaylistBtn')?.classList.toggle('hidden', !isPlaylist);
+    document.getElementById('deletePlaylistBtn')?.classList.toggle('hidden', !isPlaylist);
+}
+
+function onPlaylistSelect(value) {
+    activePlaylist = value;
+    const isPlaylist = value !== 'all';
+    document.getElementById('editPlaylistBtn')?.classList.toggle('hidden', !isPlaylist);
+    document.getElementById('deletePlaylistBtn')?.classList.toggle('hidden', !isPlaylist);
+    renderSongList();
+}
+
+function startNewPlaylist() {
+    editingPlaylistName = null;
+    isEditingPlaylist = true;
+    const nameInput = document.getElementById('playlistNameInput');
+    if (nameInput) nameInput.value = '';
+    document.getElementById('playlistEditBar').style.display = 'flex';
+    nameInput?.focus();
+    renderSongList();
+}
+
+function startEditPlaylist() {
+    if (activePlaylist === 'all') return;
+    editingPlaylistName = activePlaylist;
+    isEditingPlaylist = true;
+    const nameInput = document.getElementById('playlistNameInput');
+    if (nameInput) nameInput.value = activePlaylist;
+    document.getElementById('playlistEditBar').style.display = 'flex';
+    renderSongList();
+}
+
+function cancelEditPlaylist() {
+    isEditingPlaylist = false;
+    editingPlaylistName = null;
+    document.getElementById('playlistEditBar').style.display = 'none';
+    renderSongList();
+}
+
+function confirmSavePlaylist() {
+    const nameInput = document.getElementById('playlistNameInput');
+    const name = nameInput ? nameInput.value.trim() : '';
+    if (!name) { nameInput?.focus(); return; }
+    const checked = Array.from(document.querySelectorAll('.song-check:checked')).map(cb => cb.dataset.song);
+    if (editingPlaylistName && editingPlaylistName !== name) delete playlists[editingPlaylistName];
+    playlists[name] = checked;
+    savePlaylists();
+    isEditingPlaylist = false;
+    editingPlaylistName = null;
+    activePlaylist = name;
+    document.getElementById('playlistEditBar').style.display = 'none';
+    renderPlaylistBar();
+    const sel = document.getElementById('playlistSelect');
+    if (sel) { sel.value = name; }
+    renderSongList();
+}
+
+function deleteActivePlaylist() {
+    if (activePlaylist === 'all') return;
+    if (!confirm(`Delete playlist "${activePlaylist}"?`)) return;
+    delete playlists[activePlaylist];
+    savePlaylists();
+    activePlaylist = 'all';
+    renderPlaylistBar();
+    renderSongList();
+}
+
+function exportPlaylists() {
+    const blob = new Blob([JSON.stringify(playlists, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = 'playlists.json'; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importPlaylists() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = evt => {
+            try {
+                const imported = JSON.parse(evt.target.result);
+                if (typeof imported === 'object' && !Array.isArray(imported)) {
+                    playlists = { ...playlists, ...imported };
+                    savePlaylists();
+                    renderPlaylistBar();
+                    renderSongList();
+                } else { alert('Invalid playlists file.'); }
+            } catch(e) { alert('Could not read file.'); }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Mobile sidebar toggle
 // ══════════════════════════════════════════════════════════════════════════════
 function toggleSidebar() {
@@ -2377,6 +2703,8 @@ if ('serviceWorker' in navigator) {
 // ══════════════════════════════════════════════════════════════════════════════
 // Boot — load the manifest as soon as the page is ready
 // ══════════════════════════════════════════════════════════════════════════════
+loadPlaylists();
+renderPlaylistBar();
 loadManifest();
 
 </script>
