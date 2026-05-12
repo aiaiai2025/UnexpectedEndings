@@ -2592,11 +2592,11 @@ function confirmSavePlaylist() {
     savePlaylists();
     isEditingPlaylist = false;
     editingPlaylistName = null;
-    activePlaylist = name;
     document.getElementById('playlistEditBar').style.display = 'none';
     renderPlaylistBar();
     const sel = document.getElementById('playlistSelect');
     if (sel) { sel.value = name; }
+    activePlaylist = name;   // must be set AFTER renderPlaylistBar() resets it
     renderSongList();
 }
 
